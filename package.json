@@ -1,0 +1,11 @@
+{
+  "name": "yombcpu",
+  "version": "1.0",
+  "description": "CPU and memory monitor with Arduino and oled screen",
+  "dependencies": {
+    "serialport": "^8.0.7"
+  },
+  "scripts": {
+    "start": "node yombcpu.js"
+  }
+}
