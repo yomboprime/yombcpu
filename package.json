@@ -1,6 +1,6 @@
 {
   "name": "yombcpu",
-  "version": "1.0",
+  "version": "1.0.0",
   "description": "CPU and memory monitor with Arduino and oled screen",
   "dependencies": {
     "serialport": "^8.0.7"
