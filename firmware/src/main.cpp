@@ -24,7 +24,7 @@ THE SOFTWARE.
 
 -----
 
-This is yombcpu firmware, to monitor CPU usage and provide user buttons
+This is yombcpu firmware, to monitor CPU and memory usage and provide user buttons
 
 Arduino nano's I2C pinout:
 
