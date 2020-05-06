@@ -1,4 +1,5 @@
 
+
 // Configuration parameters
 
 // Addon serial port name or device
@@ -13,6 +14,7 @@ var SerialPort = require( 'serialport' );
 //var fs = require( 'fs' );
 //var pathJoin = require( 'path' ).join;
 
+var spawn = require( 'child_process' ).spawn;
 
 // Global variables
 
@@ -20,6 +22,13 @@ var isAppEnding = false;
 var cpuUsage = null;
 var serialPort = null;
 var serialWriteBuffer = [ ];
+
+var prevButtons = 0;
+
+var monitorIsOn = true;
+var monitorForcedOn = false;
+var monitorForcedOff = false;
+
 
 // Main code
 
@@ -29,17 +38,20 @@ init();
 // Functions
 
 function init() {
-	
+
 	// Termination signal
 	process.on( "SIGINT", function() {
 
 		console.error( " SIGINT Signal Received, shutting down." );
-		
+
 		terminate();
 
 	} );
 
 	connectSerial();
+
+	monitorTask();
+
 
 }
 
@@ -65,42 +77,50 @@ function connectSerial( onSerialConnected ) {
 
 			}
 
-			var status = msg[ 0 ];
+			var buttons = msg[ 0 ];
+
+			processButtons( buttons );
 
 			// Get CPUs usage
 			cpuUsage = getCoresUsage( cpuUsage );
-			
+
 			// Get memory usage
 			var memUsage = 1 - ( os.freemem() / os.totalmem() );
-		
+
 			var numProcs = cpuUsage.length;
 
 			numProcs = Math.min( 31, numProcs );
-			
+
 			// + 1 for the initial bytecount byte
 			// + 1 for the memory usage bar at the end
-			var numBytes = 1 + numProcs + 1;
+			var numBytes = 1 + numProcs + 1 /*+ 4*/;
 
 			if ( numBytes !== serialWriteBuffer.length ) {
-				
+
 				serialWriteBuffer = [];
 
 				for ( var i = 0; i < numBytes; i ++ ) serialWriteBuffer[ i ] = 0;
 
 			}
-			
+
 			// + 128: Start frame flag
 			// + 1 for the memory usage bar at the end
 			serialWriteBuffer[ 0 ] = 128 + numProcs + 1;
-			
+
 			for ( var i = 0; i < numProcs; i++ ) {
-				
+
 				var u = cpuUsage[ i ];
 
 				serialWriteBuffer[ i + 1 ] = u.currentValid ? Math.floor( u.currentValue * 127 ) : 0;
 
 			}
-			
+			/*
+			serialWriteBuffer[ 4 ] = 30;
+			serialWriteBuffer[ 5 ] = 40;
+			serialWriteBuffer[ 6 ] = 50;
+			serialWriteBuffer[ 7 ] = 60;
+			*/
+
 			// Fill in the memory usage
 			serialWriteBuffer[ numBytes - 1 ] = memUsage * 127;
 
@@ -131,6 +151,51 @@ function connectSerial( onSerialConnected ) {
 		}
 
 	} );
+
+}
+
+function monitorTask() {
+
+	var sleepTime = 500;
+
+	if ( ! monitorIsOn ) {
+
+		// Turn off monitor. It will turn on again by itself in a second or so.
+		if ( ! monitorForcedOff ) {
+
+			spawn( "xset", [ "dpms", "force", "off" ] );
+			monitorForcedOff = true;
+
+		}
+
+	}
+	else {
+
+		if ( ! monitorForcedOn ) {
+
+			spawn( "xset", [ "dpms", "force", "on" ] );
+			monitorForcedOn = true;
+
+		}
+
+	}
+
+	if ( monitorForcedOff ) {
+
+		monitorForcedOff = false;
+
+	}
+	if ( monitorForcedOn ) {
+
+		monitorForcedOn = false;
+
+	}
+
+	if ( ! isAppEnding ) {
+
+		setTimeout( monitorTask, sleepTime );
+
+	}
 
 }
 
@@ -170,11 +235,11 @@ function disconnectSerial( onClosed ) {
 function terminate() {
 
 	isAppEnding = true;
-	
+
 	disconnectSerial( function() {
-		
+
 		process.exit( 0 );
-		
+
 	} );
 
 }
@@ -182,15 +247,15 @@ function terminate() {
 function getCoresUsage( arr ) {
 
 	var cpus = os.cpus();
-	
+
 	var numProcs = cpus.length;
-	
+
 	if ( ( ! arr ) || arr.length !== numProcs ) {
-		
+
 		arr = [];
-		
+
 		for ( var i = 0; i < numProcs; i ++ ) {
-		
+
 			arr[ i ] = {
 				inited: false,
 				currentValid: false,
@@ -198,9 +263,9 @@ function getCoresUsage( arr ) {
 				previousIdle: 0,
 				previousSum: 0
 			}
-			
+
 		}
-		
+
 	}
 
 	for ( var i = 0; i < numProcs; i ++ ) {
@@ -215,25 +280,47 @@ function getCoresUsage( arr ) {
 		}
 
 		var usageI = arr[ i ];
-		
+
 		var prevIdle = usageI.previousIdle;
 		usageI.previousIdle = cpu.times.idle;
 		var prevSum = usageI.previousSum;
 		usageI.previousSum = timeSum;
-			
+
 		if ( usageI.inited ) {
 
 			usageI.currentValue = 1 - ( usageI.previousIdle - prevIdle ) / ( usageI.previousSum - prevSum );
 			usageI.currentValid = true;
-			
+
 		}
 		else {
 
 			usageI.inited = true;
-			
+
 		}
 
 	}
-	
+
 	return arr;
-} 
+}
+
+function processButtons( buttons ) {
+
+	var pressedButtons = ( ( ~ prevButtons ) & buttons );
+	var depressedButtons = ( prevButtons & ( ~ buttons ) );
+
+	if ( pressedButtons & 1 ) {
+
+		console.log( "Monitor turn ON" );
+		monitorIsOn = true;
+
+	}
+	else if ( depressedButtons & 1 ) {
+
+		console.log( "Monitor turn OFF" );
+		monitorIsOn = false;
+
+	}
+
+	prevButtons = buttons;
+
+}
