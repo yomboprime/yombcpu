@@ -71,6 +71,8 @@ init();
 
 function init() {
 
+	process.title = "yombcpu";
+
 	// Termination signal
 	process.on( "SIGINT", function() {
 

@@ -21,7 +21,7 @@ The serial port name and baud rate used to communicate with the Arduino is at th
 
 This program is Open Source, made available with the MIT license.
 
-### Instalation
+### Installation
 
 ```
 git clone https://github.com/yomboprime/yombcpu
